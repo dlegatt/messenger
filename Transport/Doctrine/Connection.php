@@ -111,19 +111,19 @@ class Connection
         $queryBuilder = $this->driverConnection->createQueryBuilder()
             ->insert($this->configuration['table_name'])
             ->values([
-                'body' => '?',
-                'headers' => '?',
-                'queue_name' => '?',
-                'created_at' => '?',
-                'available_at' => '?',
+                'body' => ':body',
+                'headers' => ':headers',
+                'queue_name' => ':queue_name',
+                'created_at' => ':created_at',
+                'available_at' => ':available_at',
             ]);
 
         $this->executeQuery($queryBuilder->getSQL(), [
-            $body,
-            json_encode($headers),
-            $this->configuration['queue_name'],
-            self::formatDateTime($now),
-            self::formatDateTime($availableAt),
+            ':body' => $body,
+            ':headers' => json_encode($headers),
+            ':queue_name' => $this->configuration['queue_name'],
+            ':created_at' => self::formatDateTime($now),
+            ':available_at' => self::formatDateTime($availableAt),
         ]);
 
         return $this->driverConnection->lastInsertId();
@@ -156,12 +156,12 @@ class Connection
 
             $queryBuilder = $this->driverConnection->createQueryBuilder()
                 ->update($this->configuration['table_name'])
-                ->set('delivered_at', '?')
-                ->where('id = ?');
+                ->set('delivered_at', ':delivered_at')
+                ->where('id = :id');
             $now = new \DateTime();
             $this->executeQuery($queryBuilder->getSQL(), [
-                $doctrineEnvelope['id'],
-                self::formatDateTime($now),
+                ':id' => $doctrineEnvelope['id'],
+                ':delivered_at' => self::formatDateTime($now),
             ]);
 
             $this->driverConnection->commit();
@@ -249,10 +249,10 @@ class Connection
         }
 
         $queryBuilder = $this->createQueryBuilder()
-            ->where('m.id = ?');
+            ->where('m.id = :id');
 
         $data = $this->executeQuery($queryBuilder->getSQL(), [
-            $id,
+            'id' => $id,
         ])->fetch();
 
         return false === $data ? null : $this->decodeEnvelopeHeaders($data);
@@ -264,13 +264,13 @@ class Connection
         $redeliverLimit = (clone $now)->modify(sprintf('-%d seconds', $this->configuration['redeliver_timeout']));
 
         return $this->createQueryBuilder()
-            ->where('m.delivered_at is null OR m.delivered_at < ?')
-            ->andWhere('m.available_at <= ?')
-            ->andWhere('m.queue_name = ?')
+            ->where('m.delivered_at is null OR m.delivered_at < :redeliver_limit')
+            ->andWhere('m.available_at <= :now')
+            ->andWhere('m.queue_name = :queue_name')
             ->setParameters([
-                self::formatDateTime($redeliverLimit),
-                self::formatDateTime($now),
-                $this->configuration['queue_name'],
+                ':now' => self::formatDateTime($now),
+                ':queue_name' => $this->configuration['queue_name'],
+                ':redeliver_limit' => self::formatDateTime($redeliverLimit),
             ]);
     }
 
